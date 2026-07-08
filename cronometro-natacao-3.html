@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Cronômetro de Natação</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Barlow:wght@400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --accent: #34e0c4;
+    --accent-soft: #1c8f7d;
+    --violet: #8b7bf2;
+    --ink: #050810;
+    --glass: rgba(255,255,255,.05);
+    --glass-border: rgba(255,255,255,.10);
+    --foam: #eef4f3;
+    --lime: #9dff6c;
+    --red: #ff6161;
+    --gold: #f0c445;
+    --muted: #7f8ba0;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; color:var(--foam); font-family:'Barlow',sans-serif; overflow-x:hidden;}
+  body{
+    padding-bottom:44px;
+    background:
+      radial-gradient(ellipse 90% 40% at 50% 0%, rgba(52,224,196,.16), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 85% 15%, rgba(139,123,242,.14), transparent 55%),
+      linear-gradient(180deg, #030509 0%, #061019 30%, #050a14 65%, #020306 100%);
+    background-color:var(--ink);
+    min-height:100vh;
+  }
+
+  .header{ position:relative; padding:20px 18px 34px; overflow:hidden; }
+  .header-top{ display:flex; align-items:center; justify-content:space-between; position:relative; z-index:2; }
+  .eyebrow{
+    font-family:'Oswald',sans-serif; font-weight:500; letter-spacing:.2em; text-transform:uppercase;
+    font-size:10.5px; color:var(--accent); margin:0 0 3px;
+  }
+  .title{
+    font-family:'Oswald',sans-serif; font-weight:700; letter-spacing:.01em;
+    font-size:23px; margin:0; color:var(--foam); text-transform:uppercase;
+  }
+  .menu-btn{
+    width:42px; height:42px; border-radius:12px; border:1px solid var(--glass-border);
+    background:var(--glass); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center;
+    cursor:pointer; flex-shrink:0;
+  }
+  .menu-btn span{ display:block; width:18px; height:2px; background:var(--foam); border-radius:2px; position:relative; }
+  .menu-btn span::before, .menu-btn span::after{ content:''; position:absolute; left:0; width:18px; height:2px; background:var(--foam); border-radius:2px; }
+  .menu-btn span::before{ top:-6px; } .menu-btn span::after{ top:6px; }
+  .wave{ position:absolute; left:0; right:0; bottom:-2px; height:60px; z-index:1; opacity:.5; }
+
+  .wrap{ padding:0 18px 18px; max-width:520px; margin:0 auto; }
+
+  .dial-wrap{ position:relative; width:min(300px, 78vw); margin:10px auto 8px; aspect-ratio:1/1; }
+  .dial-svg{ width:100%; height:100%; display:block; filter:drop-shadow(0 16px 34px rgba(0,0,0,.5)); }
+  .tick{ stroke:rgba(238,244,243,.32); }
+  .tick.major{ stroke:rgba(52,224,196,.55); }
+  .hand{ stroke:var(--accent); stroke-linecap:round; }
+  .hand-center{ fill:var(--accent); }
+  .hand-center-ring{ fill:none; stroke:var(--accent); stroke-opacity:.28; }
+
+  .dial-center{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    pointer-events:none;
+  }
+  .clock{
+    font-family:'Share Tech Mono', monospace; font-size:clamp(28px, 7.5vw, 38px);
+    letter-spacing:.01em; color:var(--foam); font-variant-numeric: tabular-nums;
+  }
+  .clock .cs{ font-size:.6em; color:var(--muted); }
+  .status-tag{
+    margin-top:8px; font-family:'Oswald',sans-serif; font-size:10.5px; letter-spacing:.16em; text-transform:uppercase;
+    padding:4px 12px; border-radius:999px; background:rgba(255,255,255,.05); color:var(--muted); border:1px solid var(--glass-border);
+  }
+  .status-tag.running{ color:var(--accent); border-color:rgba(52,224,196,.4); }
+
+  .action-row{ display:flex; justify-content:space-between; align-items:center; max-width:320px; margin:20px auto 6px; padding:0 4px; }
+  .round-btn{
+    width:80px; height:80px; border-radius:50%; border:none;
+    font-family:'Oswald',sans-serif; font-weight:600; letter-spacing:.03em; text-transform:uppercase; font-size:14px;
+    cursor:pointer; transition:transform .08s ease, background .2s ease; display:flex; align-items:center; justify-content:center;
+  }
+  .round-btn:active{ transform:scale(.95); }
+  .round-btn:disabled{ opacity:.35; cursor:not-allowed; }
+  .round-btn.start{ background:radial-gradient(circle at 35% 30%, #6cf3d9, var(--accent)); color:#032018; box-shadow:0 8px 20px rgba(52,224,196,.32); }
+  .round-btn.start.stop{ background:radial-gradient(circle at 35% 30%, #ff9a9a, var(--red)); color:#210606; box-shadow:0 8px 20px rgba(255,97,97,.28); }
+  .round-btn.lap{ background:var(--glass); backdrop-filter:blur(8px); color:var(--foam); border:1px solid var(--glass-border); }
+
+  .reset-row{ text-align:center; margin-top:14px; }
+  .btn-reset{
+    background:none; border:1px solid var(--glass-border); color:var(--muted);
+    font-family:'Oswald',sans-serif; font-size:12px; letter-spacing:.08em; text-transform:uppercase;
+    padding:8px 20px; border-radius:999px; cursor:pointer;
+  }
+  .btn-reset:disabled{ opacity:.3; cursor:not-allowed; }
+
+  .glass{
+    background:var(--glass); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--glass-border); border-radius:18px;
+  }
+
+  .config{ margin-top:20px; padding:16px; }
+  .config-title{ font-family:'Oswald',sans-serif; font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin:0 0 10px;}
+  .config-row{ display:flex; gap:10px; }
+  .field{ flex:1; }
+  .field label{ display:block; font-size:11px; color:var(--muted); margin-bottom:4px; }
+  .field input{
+    width:100%; background:rgba(255,255,255,.06); border:1px solid var(--glass-border); color:var(--foam);
+    border-radius:10px; padding:10px; font-family:'Share Tech Mono',monospace; font-size:15px;
+  }
+  .pool-chips{ display:flex; gap:8px; margin-top:8px; }
+  .chip{
+    flex:1; text-align:center; padding:9px 4px; border-radius:10px; border:1px solid var(--glass-border);
+    background:rgba(255,255,255,.05); color:var(--foam); font-family:'Oswald',sans-serif; font-size:13px;
+    cursor:pointer; user-select:none;
+  }
+  .chip.active{ background:var(--accent); color:#032018; border-color:var(--accent); font-weight:600; }
+  .lap-unit-row{ display:none; }
+  .lap-unit-row .chip{ font-size:11.5px; }
+  .config-hint{ font-size:11px; color:var(--muted); margin-top:8px; line-height:1.4; }
+  .config-info{ font-size:12px; color:var(--gold); margin-top:8px; font-family:'Oswald',sans-serif; letter-spacing:.03em; }
+
+  .projection{ margin-top:16px; padding:16px; display:none; }
+  .projection.active{ display:block; }
+  .projection-title{ font-family:'Oswald',sans-serif; font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); margin:0 0 10px; }
+  .proj-grid{ display:flex; gap:10px; }
+  .proj-cell{ flex:1; text-align:center; background:rgba(0,0,0,.2); border-radius:12px; padding:10px 4px; }
+  .proj-value{ font-family:'Share Tech Mono',monospace; font-size:19px; }
+  .proj-label{ font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-top:4px; }
+
+  .laps-title{ font-family:'Oswald',sans-serif; font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin:22px 0 8px; padding:0 2px; }
+  .lap-header, .lap-row{ display:grid; grid-template-columns: 30px 1fr 1fr 1fr; gap:8px; align-items:center; padding:10px 12px; border-radius:12px; }
+  .lap-header{ font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; padding-bottom:4px; }
+  .lap-row{ background:rgba(255,255,255,.035); border:1px solid var(--glass-border); margin-bottom:6px; font-family:'Share Tech Mono',monospace; font-size:13.5px; }
+  .lap-row.fastest{ background:rgba(157,255,108,.1); border-color:rgba(157,255,108,.4); }
+  .lap-row.fastest .lap-num{ color:var(--lime); }
+  .lap-row.slowest{ background:rgba(255,97,97,.1); border-color:rgba(255,97,97,.4); }
+  .lap-row.slowest .lap-num{ color:var(--red); }
+  .lap-num{ font-family:'Oswald',sans-serif; font-weight:600; color:var(--muted); }
+  .lap-chip{ font-family:'Oswald',sans-serif; font-size:9px; letter-spacing:.08em; text-transform:uppercase; padding:2px 6px; border-radius:6px; margin-left:6px; }
+  .lap-chip.best{ background:var(--lime); color:#0c1a06; }
+  .lap-chip.worst{ background:var(--red); color:#1a0505; }
+  .empty-state{ text-align:center; color:var(--muted); font-size:13px; padding:20px 10px; }
+
+  .action-buttons{ margin-top:18px; display:flex; gap:10px; }
+  .btn-action{
+    flex:1; padding:15px 8px; border-radius:14px; border:none; cursor:pointer;
+    font-family:'Oswald',sans-serif; font-weight:600; letter-spacing:.05em; text-transform:uppercase; font-size:12.5px;
+    background:rgba(255,255,255,.05); color:var(--muted); border:1px solid var(--glass-border);
+    transition:background .25s ease, color .25s ease, box-shadow .25s ease;
+  }
+  .btn-action:disabled{ cursor:not-allowed; }
+  .btn-action.ready.pdf{ background:linear-gradient(155deg, #6cf3d9, var(--accent)); color:#032018; box-shadow:0 8px 20px rgba(52,224,196,.28); border-color:transparent; }
+  .btn-action.ready.archive{ background:linear-gradient(155deg, #a89bff, var(--violet)); color:#160c3b; box-shadow:0 8px 20px rgba(139,123,242,.3); border-color:transparent; }
+  .btn-action:active{ transform:scale(.98); }
+  .export-hint{ text-align:center; font-size:11px; color:var(--muted); margin-top:8px; }
+
+  /* History menu overlay */
+  .overlay{
+    position:fixed; inset:0; background:rgba(3,5,9,.88); backdrop-filter:blur(6px);
+    z-index:50; display:none; flex-direction:column;
+  }
+  .overlay.open{ display:flex; }
+  .overlay-header{ display:flex; align-items:center; justify-content:space-between; padding:20px 18px 14px; }
+  .overlay-title{ font-family:'Oswald',sans-serif; font-weight:700; text-transform:uppercase; font-size:18px; letter-spacing:.02em; }
+  .close-btn{
+    width:38px; height:38px; border-radius:10px; border:1px solid var(--glass-border); background:var(--glass);
+    color:var(--foam); font-size:18px; display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .overlay-body{ flex:1; overflow-y:auto; padding:0 18px 30px; max-width:520px; margin:0 auto; width:100%; }
+  .history-card{ padding:16px; margin-bottom:12px; }
+  .history-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .history-name{ font-family:'Oswald',sans-serif; font-weight:600; font-size:15px; color:var(--foam); }
+  .history-date{ font-size:11px; color:var(--muted); margin-top:2px; }
+  .history-del{
+    background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; padding:2px 6px; flex-shrink:0;
+  }
+  .history-stats{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .history-stat{ background:rgba(0,0,0,.2); border-radius:10px; padding:8px 10px; flex:1; min-width:80px; text-align:center; }
+  .history-stat .v{ font-family:'Share Tech Mono',monospace; font-size:15px; }
+  .history-stat .l{ font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-top:2px; }
+  .history-stat.best .v{ color:var(--lime); }
+  .history-stat.worst .v{ color:var(--red); }
+  .history-empty{ text-align:center; color:var(--muted); padding:60px 20px; font-size:14px; line-height:1.6; }
+</style>
+</head>
+<body>
+
+  <div class="header">
+    <svg class="wave" viewBox="0 0 400 60" preserveAspectRatio="none">
+      <path d="M0,30 C60,55 140,5 200,30 C260,55 340,5 400,30 L400,60 L0,60 Z" fill="rgba(52,224,196,.08)"/>
+      <path d="M0,40 C70,15 130,55 200,40 C270,20 330,55 400,40 L400,60 L0,60 Z" fill="rgba(139,123,242,.08)"/>
+    </svg>
+    <div class="header-top">
+      <div>
+        <p class="eyebrow">Piscina &middot; Natação</p>
+        <h1 class="title">Cronômetro</h1>
+      </div>
+      <button class="menu-btn" id="menuBtn" aria-label="Histórico de provas"><span></span></button>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <div class="dial-wrap">
+      <svg class="dial-svg" viewBox="0 0 300 300">
+        <defs>
+          <radialGradient id="faceGrad" cx="35%" cy="30%" r="75%">
+            <stop offset="0%" stop-color="#182634"/>
+            <stop offset="100%" stop-color="#080c13"/>
+          </radialGradient>
+        </defs>
+        <circle cx="150" cy="150" r="140" fill="url(#faceGrad)"/>
+        <g id="ticks"></g>
+        <line id="hand" class="hand" x1="150" y1="150" x2="150" y2="45" stroke-width="3"/>
+        <circle class="hand-center-ring" cx="150" cy="150" r="10"/>
+        <circle class="hand-center" cx="150" cy="150" r="5"/>
+      </svg>
+      <div class="dial-center">
+        <div class="clock" id="clockDisplay">00:00<span class="cs">,00</span></div>
+        <div class="status-tag" id="statusTag">Pronto</div>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <button class="round-btn start" id="startBtn">Iniciar</button>
+      <button class="round-btn lap" id="lapBtn" disabled>Volta</button>
+    </div>
+    <div class="reset-row">
+      <button class="btn-reset" id="resetBtn" disabled>Zerar</button>
+    </div>
+
+    <div class="config glass" id="configPanel">
+      <p class="config-title">Configurar prova (opcional, dá pra ajustar a qualquer momento)</p>
+      <div class="field" style="margin-bottom:10px;">
+        <label for="eventName">Nome da prova</label>
+        <input type="text" id="eventName" placeholder="ex: 200m peito">
+      </div>
+      <div class="config-row">
+        <div class="field">
+          <label for="totalDistance">Distância da prova (m)</label>
+          <input type="number" id="totalDistance" placeholder="ex: 400" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label for="poolLength">Piscina (m)</label>
+          <input type="number" id="poolLength" placeholder="ex: 25" inputmode="numeric">
+        </div>
+      </div>
+      <div class="pool-chips">
+        <div class="chip" data-len="25">25m</div>
+        <div class="chip" data-len="50">50m</div>
+      </div>
+      <div class="lap-unit-row" id="lapUnitRow">
+        <p class="config-title" style="margin:12px 0 6px;">Contar cada volta como:</p>
+        <div class="pool-chips">
+          <div class="chip lap-unit-chip active" data-unit="25">25m (cada parede)</div>
+          <div class="chip lap-unit-chip" data-unit="50">50m (ida e volta)</div>
+        </div>
+      </div>
+      <p class="config-info" id="poolCountInfo"></p>
+      <p class="config-hint">Toque em "Volta" a cada virada. O app calcula a distância automaticamente e, ao atingir a distância da prova, pausa o cronômetro sozinho.</p>
+    </div>
+
+    <div class="projection glass" id="projectionPanel">
+      <p class="projection-title">Projeção ao vivo</p>
+      <div class="proj-grid">
+        <div class="proj-cell"><div class="proj-value" id="projTotal">--:--</div><div class="proj-label">Tempo final est.</div></div>
+        <div class="proj-cell"><div class="proj-value" id="projRemaining">--:--</div><div class="proj-label">Faltam</div></div>
+        <div class="proj-cell"><div class="proj-value" id="projPace">--.-</div><div class="proj-label">Ritmo (m/s)</div></div>
+      </div>
+    </div>
+
+    <p class="laps-title">Viradas / Parciais</p>
+    <div class="lap-header"><span>#</span><span>Parcial</span><span>Total</span><span>Dist.</span></div>
+    <div id="lapsList">
+      <div class="empty-state" id="emptyState">Nenhuma virada registrada ainda.</div>
+    </div>
+
+    <div class="action-buttons">
+      <button class="btn-action pdf" id="exportBtn" disabled>Exportar PDF</button>
+      <button class="btn-action archive" id="archiveBtn" disabled>Arquivar</button>
+    </div>
+    <p class="export-hint" id="exportHint">Fica disponível quando a prova for concluída.</p>
+
+  </div>
+
+  <div class="overlay" id="historyOverlay">
+    <div class="overlay-header">
+      <span class="overlay-title">Histórico de provas</span>
+      <button class="close-btn" id="closeHistoryBtn">✕</button>
+    </div>
+    <div class="overlay-body" id="historyBody"></div>
+  </div>
+
+<script>
+(function(){
+  let running = false;
+  let startTs = null;
+  let accumulatedMs = 0;
+  let rafId = null;
+  let laps = [];
+  let archivedThisRace = false;
+
+  const clockDisplay = document.getElementById('clockDisplay');
+  const statusTag = document.getElementById('statusTag');
+  const startBtn = document.getElementById('startBtn');
+  const lapBtn = document.getElementById('lapBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const hand = document.getElementById('hand');
+  const ticksGroup = document.getElementById('ticks');
+  const totalDistanceInput = document.getElementById('totalDistance');
+  const poolLengthInput = document.getElementById('poolLength');
+  const eventNameInput = document.getElementById('eventName');
+  const poolCountInfo = document.getElementById('poolCountInfo');
+  const chips = document.querySelectorAll('.pool-chips > .chip:not(.lap-unit-chip)');
+  const lapUnitRow = document.getElementById('lapUnitRow');
+  const lapUnitChips = document.querySelectorAll('.lap-unit-chip');
+  let lapUnitOverride = 25;
+  const projectionPanel = document.getElementById('projectionPanel');
+  const projTotal = document.getElementById('projTotal');
+  const projRemaining = document.getElementById('projRemaining');
+  const projPace = document.getElementById('projPace');
+  const lapsList = document.getElementById('lapsList');
+  const emptyState = document.getElementById('emptyState');
+  const exportBtn = document.getElementById('exportBtn');
+  const archiveBtn = document.getElementById('archiveBtn');
+  const exportHint = document.getElementById('exportHint');
+  const menuBtn = document.getElementById('menuBtn');
+  const closeHistoryBtn = document.getElementById('closeHistoryBtn');
+  const historyOverlay = document.getElementById('historyOverlay');
+  const historyBody = document.getElementById('historyBody');
+
+  const STORAGE_KEY = 'natacao_provas_arquivadas';
+
+  function loadArchive(){
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch(e){ return []; }
+  }
+  function saveArchive(list){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
+    catch(e){ /* storage unavailable in this context */ }
+  }
+
+  (function buildTicks(){
+    const cx = 150, cy = 150;
+    for (let i = 0; i < 60; i++){
+      const isMajor = i % 5 === 0;
+      const r1 = isMajor ? 116 : 124;
+      const r2 = 134;
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', cx); line.setAttribute('y1', cy - r1);
+      line.setAttribute('x2', cx); line.setAttribute('y2', cy - r2);
+      line.setAttribute('class', 'tick' + (isMajor ? ' major' : ''));
+      line.setAttribute('stroke-width', isMajor ? '2.4' : '1.4');
+      line.setAttribute('transform', `rotate(${i * 6} ${cx} ${cy})`);
+      ticksGroup.appendChild(line);
+    }
+  })();
+
+  function fmt(ms, withCentis){
+    if (ms < 0) ms = 0;
+    const totalCs = Math.floor(ms / 10);
+    const cs = totalCs % 100;
+    const totalSec = Math.floor(totalCs / 100);
+    const s = totalSec % 60;
+    const m = Math.floor(totalSec / 60);
+    const pad = (n, len) => String(n).padStart(len || 2, '0');
+    if (withCentis === false) return `${pad(m)}:${pad(s)}`;
+    return { main: `${pad(m)}:${pad(s)}`, cs: pad(cs) };
+  }
+
+  function currentElapsed(){
+    if (!running) return accumulatedMs;
+    return accumulatedMs + (performance.now() - startTs);
+  }
+
+  function updateHand(ms){
+    const secondsIntoMinute = (ms / 1000) % 60;
+    hand.setAttribute('transform', `rotate(${secondsIntoMinute * 6} 150 150)`);
+  }
+
+  function tick(){
+    const ms = currentElapsed();
+    const f = fmt(ms);
+    clockDisplay.innerHTML = `${f.main}<span class="cs">,${f.cs}</span>`;
+    updateHand(ms);
+    updateProjection(ms);
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function getLapDistance(){
+    const poolLen = parseFloat(poolLengthInput.value);
+    if (poolLen === 25) return lapUnitOverride;
+    return poolLen;
+  }
+
+  function refreshLapUnitVisibility(){
+    const poolLen = parseFloat(poolLengthInput.value);
+    lapUnitRow.style.display = (poolLen === 25) ? 'block' : 'none';
+  }
+
+  function updatePoolInfo(){
+    const total = parseFloat(totalDistanceInput.value);
+    const lapLen = getLapDistance();
+    if (total > 0 && lapLen > 0){
+      const count = total / lapLen;
+      poolCountInfo.textContent = `≈ ${count % 1 === 0 ? count : count.toFixed(1)} viradas de ${lapLen}m para completar ${total}m`;
+    } else {
+      poolCountInfo.textContent = '';
+    }
+  }
+
+  function updateProjection(elapsedMs){
+    const total = parseFloat(totalDistanceInput.value);
+    if (!total || laps.length === 0){ projectionPanel.classList.remove('active'); return; }
+    const last = laps[laps.length - 1];
+    if (!last.distance || last.distance <= 0){ projectionPanel.classList.remove('active'); return; }
+    projectionPanel.classList.add('active');
+    const paceMsPerMeter = last.cumMs / last.distance;
+    const projectedTotalMs = paceMsPerMeter * total;
+    const remainingMs = Math.max(0, projectedTotalMs - elapsedMs);
+    const paceMps = last.distance / (last.cumMs / 1000);
+    projTotal.textContent = fmt(projectedTotalMs, false) + ',' + fmt(projectedTotalMs).cs;
+    projRemaining.textContent = fmt(remainingMs, false) + ',' + fmt(remainingMs).cs;
+    projPace.textContent = paceMps.toFixed(2);
+  }
+
+  function getFastestSlowest(){
+    let fastestIdx = 0, slowestIdx = 0;
+    for (let i = 1; i < laps.length; i++){
+      if (laps[i].splitMs < laps[fastestIdx].splitMs) fastestIdx = i;
+      if (laps[i].splitMs > laps[slowestIdx].splitMs) slowestIdx = i;
+    }
+    return { fastestIdx, slowestIdx };
+  }
+
+  function renderLaps(){
+    if (laps.length === 0){ lapsList.innerHTML = ''; lapsList.appendChild(emptyState); return; }
+    const { fastestIdx, slowestIdx } = getFastestSlowest();
+    const showBadges = laps.length > 1 && fastestIdx !== slowestIdx;
+    lapsList.innerHTML = '';
+    laps.forEach((lap, i) => {
+      const isBest = showBadges && i === fastestIdx;
+      const isWorst = showBadges && i === slowestIdx;
+      const row = document.createElement('div');
+      row.className = 'lap-row' + (isBest ? ' fastest' : '') + (isWorst ? ' slowest' : '');
+      const distText = lap.distance ? `${lap.distance}m` : '—';
+      row.innerHTML = `
+        <span class="lap-num">${i + 1}</span>
+        <span>${fmt(lap.splitMs, false)},${fmt(lap.splitMs).cs}${isBest ? '<span class="lap-chip best">Melhor</span>' : ''}${isWorst ? '<span class="lap-chip worst">Pior</span>' : ''}</span>
+        <span>${fmt(lap.cumMs, false)},${fmt(lap.cumMs).cs}</span>
+        <span>${distText}</span>
+      `;
+      lapsList.appendChild(row);
+    });
+  }
+
+  function checkRaceComplete(){
+    if (laps.length === 0){ setActionsState(false); return; }
+    const total = parseFloat(totalDistanceInput.value);
+    const last = laps[laps.length - 1];
+    let complete = false;
+    if (total > 0 && last.distance){ complete = last.distance >= total; }
+    else if (!total) { complete = !running; }
+    setActionsState(complete);
+  }
+
+  function setActionsState(ready){
+    exportBtn.disabled = !ready;
+    exportBtn.classList.toggle('ready', ready);
+    archiveBtn.disabled = !ready || archivedThisRace;
+    archiveBtn.classList.toggle('ready', ready && !archivedThisRace);
+    if (!ready){
+      exportHint.textContent = 'Fica disponível quando a prova for concluída.';
+    } else {
+      exportHint.textContent = archivedThisRace ? 'Prova concluída e já arquivada.' : 'Prova concluída — exporte ou arquive.';
+    }
+  }
+
+  function exportPDF(){
+    if (laps.length === 0) return;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const { fastestIdx, slowestIdx } = getFastestSlowest();
+    const finalTime = laps[laps.length - 1].cumMs;
+    const total = parseFloat(totalDistanceInput.value);
+    const pool = parseFloat(poolLengthInput.value);
+
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(17);
+    doc.text('Resumo da Prova - Natação', 14, 18);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(100);
+    doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`, 14, 25);
+    doc.setTextColor(0);
+
+    const eventName = eventNameInput.value.trim();
+    let y = 36;
+    if (eventName){
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+      doc.text(`Prova: ${eventName}`, 14, y);
+      doc.setFont('helvetica', 'normal'); y += 9;
+    }
+    doc.setFontSize(11);
+    if (total) { doc.text(`Distância da prova: ${total} m`, 14, y); y += 6; }
+    if (pool) { doc.text(`Comprimento da piscina: ${pool} m`, 14, y); y += 6; }
+    doc.text(`Número de viradas: ${laps.length}`, 14, y); y += 6;
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Tempo final: ${fmt(finalTime, false)},${fmt(finalTime).cs}`, 14, y);
+    doc.setFont('helvetica', 'normal'); y += 10;
+
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 130, 40);
+    doc.text(`Melhor parcial: Volta ${fastestIdx + 1} — ${fmt(laps[fastestIdx].splitMs, false)},${fmt(laps[fastestIdx].splitMs).cs}`, 14, y);
+    y += 7;
+    doc.setTextColor(190, 40, 40);
+    doc.text(`Pior parcial: Volta ${slowestIdx + 1} — ${fmt(laps[slowestIdx].splitMs, false)},${fmt(laps[slowestIdx].splitMs).cs}`, 14, y);
+    doc.setTextColor(0); doc.setFont('helvetica', 'normal'); y += 10;
+
+    const rows = laps.map((l, i) => [
+      String(i + 1), `${fmt(l.splitMs, false)},${fmt(l.splitMs).cs}`, `${fmt(l.cumMs, false)},${fmt(l.cumMs).cs}`,
+      l.distance ? `${l.distance} m` : '—', i === fastestIdx ? 'Melhor' : (i === slowestIdx ? 'Pior' : '')
+    ]);
+    doc.autoTable({
+      startY: y, head: [['#', 'Parcial', 'Total', 'Distância', '']], body: rows, theme: 'grid',
+      headStyles: { fillColor: [12, 20, 28] },
+      didParseCell: function(data){
+        if (data.section === 'body' && data.row.raw[4] === 'Melhor'){ data.cell.styles.textColor = [30,130,40]; data.cell.styles.fontStyle='bold'; }
+        if (data.section === 'body' && data.row.raw[4] === 'Pior'){ data.cell.styles.textColor = [190,40,40]; data.cell.styles.fontStyle='bold'; }
+      }
+    });
+    doc.save('resumo-prova-natacao.pdf');
+  }
+
+  function archiveRace(){
+    if (laps.length === 0 || archivedThisRace) return;
+    const { fastestIdx, slowestIdx } = getFastestSlowest();
+    const record = {
+      id: Date.now(),
+      eventName: eventNameInput.value.trim() || 'Prova sem nome',
+      date: new Date().toISOString(),
+      totalDistance: parseFloat(totalDistanceInput.value) || null,
+      poolLength: parseFloat(poolLengthInput.value) || null,
+      finalTimeMs: laps[laps.length - 1].cumMs,
+      bestLapMs: laps[fastestIdx].splitMs,
+      worstLapMs: laps[slowestIdx].splitMs,
+      laps: laps.map(l => ({ splitMs: l.splitMs, cumMs: l.cumMs, distance: l.distance }))
+    };
+    const list = loadArchive();
+    list.unshift(record);
+    saveArchive(list);
+    archivedThisRace = true;
+    setActionsState(true);
+    archiveBtn.textContent = 'Arquivada ✓';
+  }
+
+  function renderHistory(){
+    const list = loadArchive();
+    if (list.length === 0){
+      historyBody.innerHTML = '<div class="history-empty">Nenhuma prova arquivada ainda.<br>Termine uma prova e toque em "Arquivar" para vê-la aqui.</div>';
+      return;
+    }
+    historyBody.innerHTML = '';
+    list.forEach(rec => {
+      const card = document.createElement('div');
+      card.className = 'history-card glass';
+      const dateStr = new Date(rec.date).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      const distText = rec.totalDistance ? `${rec.totalDistance}m` : '—';
+      const poolText = rec.poolLength ? ` · piscina ${rec.poolLength}m` : '';
+      card.innerHTML = `
+        <div class="history-top">
+          <div>
+            <div class="history-name">${rec.eventName}</div>
+            <div class="history-date">${dateStr} · ${distText}${poolText}</div>
+          </div>
+          <button class="history-del" data-id="${rec.id}">🗑</button>
+        </div>
+        <div class="history-stats">
+          <div class="history-stat"><div class="v">${fmt(rec.finalTimeMs, false)},${fmt(rec.finalTimeMs).cs}</div><div class="l">Tempo final</div></div>
+          <div class="history-stat best"><div class="v">${fmt(rec.bestLapMs, false)},${fmt(rec.bestLapMs).cs}</div><div class="l">Melhor volta</div></div>
+          <div class="history-stat worst"><div class="v">${fmt(rec.worstLapMs, false)},${fmt(rec.worstLapMs).cs}</div><div class="l">Pior volta</div></div>
+        </div>
+      `;
+      historyBody.appendChild(card);
+    });
+    historyBody.querySelectorAll('.history-del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = parseInt(btn.dataset.id, 10);
+        const updated = loadArchive().filter(r => r.id !== id);
+        saveArchive(updated);
+        renderHistory();
+      });
+    });
+  }
+
+  function openHistory(){ renderHistory(); historyOverlay.classList.add('open'); }
+  function closeHistory(){ historyOverlay.classList.remove('open'); }
+
+  function start(){
+    running = true; startTs = performance.now();
+    statusTag.textContent = 'Nadando'; statusTag.classList.add('running');
+    startBtn.textContent = 'Pausar'; startBtn.classList.add('stop');
+    lapBtn.disabled = false; resetBtn.disabled = true;
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function pause(){
+    running = false; accumulatedMs = currentElapsed();
+    cancelAnimationFrame(rafId);
+    statusTag.textContent = 'Pausado'; statusTag.classList.remove('running');
+    startBtn.textContent = 'Retomar'; startBtn.classList.remove('stop');
+    lapBtn.disabled = true; resetBtn.disabled = false;
+    checkRaceComplete();
+  }
+
+  function reset(){
+    running = false; accumulatedMs = 0; startTs = null; laps = []; archivedThisRace = false;
+    cancelAnimationFrame(rafId);
+    clockDisplay.innerHTML = '00:00<span class="cs">,00</span>';
+    updateHand(0);
+    statusTag.textContent = 'Pronto'; statusTag.classList.remove('running');
+    startBtn.textContent = 'Iniciar'; startBtn.classList.remove('stop');
+    lapBtn.disabled = true; resetBtn.disabled = true;
+    archiveBtn.textContent = 'Arquivar';
+    projectionPanel.classList.remove('active');
+    setActionsState(false);
+    renderLaps();
+  }
+
+  function lap(){
+    const ms = currentElapsed();
+    const prevCum = laps.length ? laps[laps.length - 1].cumMs : 0;
+    const splitMs = ms - prevCum;
+    const totalDist = parseFloat(totalDistanceInput.value);
+    const lapLen = getLapDistance();
+    let distance = null;
+    if (lapLen && lapLen > 0){
+      const rawDist = lapLen * (laps.length + 1);
+      distance = totalDist ? Math.min(rawDist, totalDist) : rawDist;
+    }
+    laps.push({ splitMs, cumMs: ms, distance });
+    renderLaps();
+    checkRaceComplete();
+    if (totalDist && distance && distance >= totalDist && running){ pause(); }
+  }
+
+  totalDistanceInput.addEventListener('input', () => { updatePoolInfo(); checkRaceComplete(); });
+  poolLengthInput.addEventListener('input', () => {
+    chips.forEach(c => c.classList.toggle('active', c.dataset.len === poolLengthInput.value));
+    refreshLapUnitVisibility(); updatePoolInfo();
+  });
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      poolLengthInput.value = chip.dataset.len;
+      chips.forEach(c => c.classList.toggle('active', c === chip));
+      refreshLapUnitVisibility(); updatePoolInfo();
+    });
+  });
+  lapUnitChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      lapUnitOverride = parseInt(chip.dataset.unit, 10);
+      lapUnitChips.forEach(c => c.classList.toggle('active', c === chip));
+      updatePoolInfo();
+    });
+  });
+
+  startBtn.addEventListener('click', () => {
+    if (!running && accumulatedMs === 0){ start(); }
+    else if (running){ pause(); }
+    else {
+      running = true; startTs = performance.now();
+      statusTag.textContent = 'Nadando'; statusTag.classList.add('running');
+      startBtn.textContent = 'Pausar'; startBtn.classList.add('stop');
+      lapBtn.disabled = false; resetBtn.disabled = true;
+      rafId = requestAnimationFrame(tick);
+    }
+  });
+
+  lapBtn.addEventListener('click', lap);
+  resetBtn.addEventListener('click', reset);
+  exportBtn.addEventListener('click', exportPDF);
+  archiveBtn.addEventListener('click', archiveRace);
+  menuBtn.addEventListener('click', openHistory);
+  closeHistoryBtn.addEventListener('click', closeHistory);
+
+})();
+</script>
+
+</body>
+</html>
